@@ -1,0 +1,218 @@
+<HTML>
+  <HEAD>
+    <TITLE>Unicoder</TITLE>
+    <META http-equiv=content-type content="text/html; charset=utf-8">
+<STYLE type=text/css>BODY {
+	FONT-SIZE: 10pt; FONT-FAMILY: Tahoma
+}
+.unicodePage {
+	FONT-SIZE: 18pt; FONT-FAMILY: "Lucida Sans Unicode"
+}
+#pageBlock {
+	MARGIN: 10px; WIDTH: 850px; HEIGHT: 800px
+}
+.blockcell {
+	WIDTH: 50px; LINE-HEIGHT: 1.2em; HEIGHT: 50px; BACKGROUND-COLOR: #f0f0f0; TEXT-ALIGN: center
+}
+.headercell {
+	WIDTH: 50px; HEIGHT: 50px; BACKGROUND-COLOR: #aaaadd; TEXT-ALIGN: center
+}
+#blockid {
+	BACKGROUND-COLOR: #9999dd
+}
+.charid {
+	FONT-SIZE: 8pt; FONT-STYLE: italic
+}
+#controls {
+	FONT-SIZE: 10pt; LEFT: 900px; WIDTH: 100px; LINE-HEIGHT: 1.8em; FONT-FAMILY: Tahoma; POSITION: absolute; TOP: 400px
+}
+#codepage {
+	PADDING-RIGHT: 3px; PADDING-LEFT: 0px; FONT-SIZE: 10pt; PADDING-BOTTOM: 0px; MARGIN: 0px 5px 0px 0px; OVERFLOW: hidden; WIDTH: 40px; PADDING-TOP: 0px; FONT-FAMILY: Tahoma; HEIGHT: 20px; TEXT-ALIGN: right
+}
+#editor {
+	MARGIN-BOTTOM: 10px; OVERFLOW: hidden; WIDTH: 400px; HEIGHT: 20px
+}
+.encoding {
+	MARGIN-BOTTOM: 10px; MARGIN-LEFT: 20px; HEIGHT: 20px
+}
+#showLink {
+	MARGIN-BOTTOM: 10px; WIDTH: 400px; TEXT-ALIGN: center
+}
+#encodingOutput {
+	MARGIN-LEFT: 10px
+}
+</STYLE>
+
+<SCRIPT language=Javascript>
+
+var gHighByte = 0;
+
+function generateUnicodeCharacter( c )
+{
+	var uniStr = "";
+	
+	for ( i = 12; i >= 0; i -= 4 ) {
+		uniStr += ((c >> i) & 0xF).toString(16).toUpperCase();
+	}
+	
+	return uniStr;
+}
+
+
+function padByte( b )
+{
+	var byteStr = "";
+	
+	if ( b < 16 ) byteStr += "0";
+	byteStr += b.toString(16).toUpperCase();
+	return byteStr;
+}
+
+function makeUnicodeEntity( value )
+{
+	// prevent damn Windows 1252 codes from squeaking through
+	if ( value >= 0x80 && value <= 0x9F ) return "&nbsp;";
+	return "&#" + value + ";";
+}
+
+
+function writeBlock( highByte )
+{
+	var codePageTableStr = "";
+	
+	codePageTableStr = "<table cellpadding=5 cellspacing=0 border=0 class=unicodePage>";
+	
+	var upper = highByte << 8;
+	
+	codePageTableStr += "<tr>";
+	codePageTableStr += "<td class=headercell id=blockid>";
+	codePageTableStr += padByte( highByte );
+	codePageTableStr += "</td>";
+	for ( var c = 0; c < 16; c++ ) {
+		codePageTableStr += "<td class=headercell style='text-align: right'>";
+		codePageTableStr += ( c << 4 ).toString(16).toUpperCase();
+		codePageTableStr += "</td>";
+	}
+	codePageTableStr += "</tr>";
+	for (var r = 0; r < 16; r++ ) {
+		codePageTableStr += "<tr>";
+		codePageTableStr += "<td class=headercell>";
+		codePageTableStr += r.toString(16).toUpperCase();
+		codePageTableStr += "</td>";
+		for (var c = 0; c < 16; c++) {
+			codePageTableStr += "<td class=blockcell>";
+			var value = ( upper + (c << 4) + r );
+			if ( value != 0 ) 
+				codePageTableStr += makeUnicodeEntity( upper + (c << 4) + r );
+			codePageTableStr += "<br><span class=charid>" + generateUnicodeCharacter(value) + "</span>";
+			codePageTableStr += "</td>";
+		}
+		codePageTableStr += "</tr>";
+	}
+	
+	codePageTableStr += "</table>"
+	
+	pageBlock.innerHTML = codePageTableStr;
+}
+
+function next() {
+	gHighByte = ( gHighByte == 0xFF ? 0 : gHighByte + 1 );
+	writeBlock(gHighByte);
+}
+
+function prev() {
+	gHighByte = ( gHighByte == 0 ? 0xFF : gHighByte - 1 );
+	writeBlock(gHighByte);
+}
+
+var gAnimate;
+var kTimeInterval = 1000;  // 3 secs
+
+function animate() {
+	gAnimate = setInterval( "next();", kTimeInterval );
+}
+
+function stopAnimation() {
+	clearInterval( gAnimate );
+}
+
+function goPage() {
+	var value = parseInt( codepage.innerText, 16 );
+	if ( value > 255 ) value = value >> 8;
+	gHighByte = value;
+	writeBlock(gHighByte);
+}
+
+
+String.prototype.mappedCharCodeAt = function(i) 
+{ 
+	var ch = this.charCodeAt(i); 
+	if ( ch >= 0xFF01 && ch <= 0xFF5E ) ch = (ch & 0xFF) + 0x20;
+	if ( ch == 0x2018 || ch == 0x2019 ) ch = 0x27;
+	if ( ch == 0x201C || ch == 0x201D ) ch = 0x22;
+	return ch; 
+};
+
+function showEncoding()
+{
+    var  c, text, encodingString;
+
+    text = editor.innerText;
+	
+	// show the Javascript encoding
+	encodingString = "";
+    for ( var i = 0; i < text.length; i++ ) {
+		c = text.charCodeAt(i);
+		encodingString += "\\u" + generateUnicodeCharacter(c);
+    }
+    javascriptLiteral.innerText = encodingString;
+	
+	// show the mapped Javascript encoding
+	encodingString = "";
+    for ( var i = 0; i < text.length; i++ ) {
+		c = text.mappedCharCodeAt(i);
+		encodingString += "\\u" + generateUnicodeCharacter(c);
+    }
+    javascriptMapped.innerText = encodingString;
+	
+	// show the HTML entities
+	encodingString = "";
+    for ( var i = 0; i < text.length; i++ ) {
+		c = text.charCodeAt(i);
+		encodingString += "&#x" + generateUnicodeCharacter(c) + ";";
+    }
+    htmlEntities.innerText = encodingString;
+	htmlEntitiesDisplayed.innerHTML = encodingString;
+	
+	// show escaped string
+	escaped.innerText = escape( text );
+	
+}
+
+</SCRIPT>
+
+<BODY>
+<H3>Unicode Encoding 
+Translator</H3><TEXTAREA id=editor rows=1></TEXTAREA><BR><A id=showLink 
+onfocus=this.blur() href="javascript:showEncoding()">Show encoding</A><BR>
+<DIV id=encodingOutput>Javascript literal:<BR>
+<DIV class=encoding id=javascriptLiteral></DIV>Javascript literal (mapped 
+ASCII):<BR>
+<DIV class=encoding id=javascriptMapped></DIV>HTML entity:<BR>
+<DIV class=encoding id=htmlEntities></DIV>Display:<BR>
+<DIV class=encoding id=htmlEntitiesDisplayed></DIV>Escaped:<BR>
+<DIV class=encoding id=escaped></DIV></DIV>
+<H3>Unicode Explorer</H3>
+<DIV class=unicodePage id=pageBlock></DIV>
+<DIV id=controls><A onfocus=this.blur() href="javascript:next()">Next</A><BR><A 
+onfocus=this.blur() href="javascript:prev()">Prev</A><BR><A onfocus=this.blur() 
+href="javascript:animate()">Animate</A><BR><A onfocus=this.blur() 
+href="javascript:stopAnimation()">Stop</A><BR>
+<DIV><TEXTAREA id=codepage></TEXTAREA><A onfocus=this.blur() 
+href="javascript:goPage()">Go</A></DIV></DIV>
+<SCRIPT>writeBlock(gHighByte);</SCRIPT>
+<!-- IFRAME style="DISPLAY: none" 
+src="res://C:\WINDOWS\System32\shdoclc.dll/dnserror.htm"></IFRAME-->
+</BODY>
+</HTML>
+
